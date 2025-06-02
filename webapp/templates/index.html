@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Pagos - Alegra</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/dropzone@6.0.0-beta.1/dist/dropzone-min.js"></script>
+    <link href="https://unpkg.com/dropzone@6.0.0-beta.1/dist/dropzone.css" rel="stylesheet" type="text/css" />
+    <style>
+        .dropzone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 0.5rem;
+            background: #f7fafc;
+        }
+        .dropzone:hover {
+            border-color: #4299e1;
+            background: #ebf8ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen py-8">
+        <div class="max-w-3xl mx-auto px-4">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Registro de Pagos</h1>
+                <p class="text-gray-600">Sube una factura PDF para registrar el pago automáticamente</p>
+                <button id="setup-btn" class="mt-4 text-sm text-blue-600 hover:text-blue-800 hidden">
+                    <i class="fas fa-cog mr-1"></i>Configurar Sistema
+                </button>
+            </div>
+
+            <!-- File Upload Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-lg font-medium mb-4">Subir Factura</h2>
+                <div id="dropzone" class="dropzone border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <p class="mt-2 text-sm text-gray-600">
+                        <span class="font-medium">Haz clic para seleccionar</span> o arrastra un archivo aquí
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1">PDF o XML (máx. 16MB)</p>
+                </div>
+            </div>
+
+            <!-- Extracted Invoice Info -->
+            <div id="invoice-info" class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6" style="display: none;">
+                <h3 class="text-lg font-medium text-blue-900 mb-4">Información Extraída de la Factura</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm text-blue-700 font-medium">Proveedor:</p>
+                        <p class="text-blue-900" id="vendor-info-name">-</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-blue-700 font-medium">Identificación:</p>
+                        <p class="text-blue-900" id="vendor-info-id">-</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-blue-700 font-medium">Número de Factura:</p>
+                        <p class="text-blue-900" id="invoice-info-number">-</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-blue-700 font-medium">Total:</p>
+                        <p class="text-blue-900" id="invoice-info-total">-</p>
+                    </div>
+                </div>
+                <div id="invoice-info-items" class="mt-4" style="display: none;">
+                    <p class="text-sm text-blue-700 font-medium mb-2">Líneas Detectadas:</p>
+                    <p class="text-blue-900" id="invoice-info-items-count">-</p>
+                </div>
+            </div>
+
+            <!-- Payment Form -->
+            <div class="bg-white rounded-lg shadow-md p-6" id="payment-form-section" style="display: none;">
+                <h2 class="text-xl font-semibold mb-4">2. Confirmar Información de la Factura</h2>
+                
+                <form id="payment-form">
+                    <!-- Contact Selection -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
+                        <div class="space-y-2">
+                            <input type="text" id="contact-search" placeholder="Buscar cliente por nombre o cédula..." 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <div id="contact-results" class="hidden bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto"></div>
+                            
+                            <div id="selected-contact" class="hidden bg-blue-50 p-3 rounded-md">
+                                <p class="font-medium text-blue-900"></p>
+                                <button type="button" onclick="clearContact()" class="text-sm text-blue-600 hover:text-blue-800">Cambiar</button>
+                            </div>
+                            
+                            <button type="button" id="new-contact-btn" class="text-sm text-blue-600 hover:text-blue-800">
+                                + Crear nuevo cliente
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- New Contact Form -->
+                    <div id="new-contact-form" class="hidden bg-gray-50 p-4 rounded-md mb-6">
+                        <h3 class="font-medium mb-3">Nuevo Cliente</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                                <input type="text" id="new-contact-name" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Cédula</label>
+                                <input type="text" id="new-contact-id" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
+                                <input type="email" id="new-contact-email" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button type="button" onclick="createContact()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Crear Cliente
+                            </button>
+                            <button type="button" onclick="cancelNewContact()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Payment Details -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Monto (₡)</label>
+                            <input type="number" id="amount" name="amount" step="0.01" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                            <input type="date" id="date" name="date" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Número de Factura</label>
+                            <input type="text" id="invoice-number" name="invoiceNumber"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Método de Pago</label>
+                            <select id="payment-method" name="paymentMethod" 
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="cash">Efectivo</option>
+                                <option value="transfer">Transferencia</option>
+                                <option value="check">Cheque</option>
+                                <option value="card">Tarjeta</option>
+                                <option value="credit">Crédito</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                        <textarea id="description" name="description" rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <!-- Line Items Display -->
+                    <div id="item-list" class="mb-6 bg-gray-50 rounded-lg p-4" style="display: none;">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-medium text-gray-700">Detalle de líneas:</h4>
+                            <div class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                                ⚠️ Revise y corrija los montos antes de enviar
+                            </div>
+                        </div>
+                        
+                        <!-- Warning message -->
+                        <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div class="flex items-start">
+                                <svg class="w-5 h-5 text-yellow-600 mt-0.5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                                <div class="text-sm">
+                                    <p class="font-medium text-yellow-800">Importante: Revise los cálculos</p>
+                                    <p class="text-yellow-700 mt-1">La IA puede malinterpretar cantidades y precios unitarios. Por favor verifique que los montos sean correctos antes de enviar.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <!-- Line items will be inserted here -->
+                        </div>
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Subtotal:</span>
+                                <span id="items-subtotal">₡0</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">IVA:</span>
+                                <span id="items-tax">₡0</span>
+                            </div>
+                            <div class="flex justify-between text-sm font-medium mt-1 pt-1 border-t">
+                                <span>Total:</span>
+                                <span id="items-total">₡0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="createPayment" checked class="mr-2">
+                            <span class="text-sm text-gray-700">Registrar pago inmediato (desmarcar para solo crear la factura)</span>
+                        </label>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex gap-3">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            Registrar Factura de Compra
+                        </button>
+                        <button type="button" onclick="resetForm()" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
+                            Cancelar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Success Message -->
+            <div id="success-message" class="hidden bg-green-50 border border-green-200 rounded-lg p-6">
+                <div class="text-center">
+                    <svg class="mx-auto h-12 w-12 text-green-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="text-lg font-medium text-green-900 mb-2">¡Factura de Compra Registrada!</h3>
+                    <p class="text-green-700 mb-4">La factura de compra ha sido registrada en Alegra.</p>
+                    <div id="success-details" class="text-sm text-green-600 mb-4"></div>
+                </div>
+                
+                <!-- Line Items Table -->
+                <div id="line-items-section" class="hidden mt-6">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Detalles de la Factura:</h4>
+                    <div class="bg-white rounded-md border border-gray-200 overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
+                                    <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">IVA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="line-items-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Line items will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-6">
+                    <button onclick="resetForm()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                        Registrar Otro Pago
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
+        <div class="bg-white p-5 rounded-lg">
+            <div class="flex items-center">
+                <svg class="animate-spin h-5 w-5 mr-3 text-blue-600" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Procesando...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedContactId = null;
+        let dropzone = null;
+        let pdfTextContent = null;
+        let lineItemsData = null;
+        window.uploadedPdfText = null;
+        window.uploadedLineItems = null;
+
+        // Define global functions outside DOMContentLoaded
+        function resetForm() {
+            // Remove all files from dropzone
+            if (dropzone) {
+                dropzone.removeAllFiles();
+            }
+            
+            // Clear form data
+            document.getElementById('amount').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('date').value = '';
+            document.getElementById('invoice-number').value = '';
+            document.getElementById('contact-search').value = '';
+            document.getElementById('payment-method').value = 'cash';
+            document.getElementById('createPayment').checked = true;
+            
+            // Clear displayed vendor info
+            document.getElementById('vendor-info-name').textContent = '-';
+            document.getElementById('vendor-info-id').textContent = '-';
+            document.getElementById('invoice-info-number').textContent = '-';
+            document.getElementById('invoice-info-total').textContent = '-';
+            document.getElementById('invoice-info-items').style.display = 'none';
+            document.getElementById('invoice-info-items-count').textContent = '-';
+            
+            // Clear any selected vendor data
+            selectedContactId = null;
+            
+            // Hide the form
+            document.getElementById('payment-form-section').style.display = 'none';
+            document.getElementById('invoice-info').style.display = 'none';
+            
+            // Clear any line items display
+            const lineItemsDiv = document.getElementById('line-items-section');
+            if (lineItemsDiv) {
+                lineItemsDiv.classList.add('hidden');
+            }
+            
+            // Clear PDF text content
+            pdfTextContent = null;
+            lineItemsData = null;
+            window.uploadedPdfText = null;
+            window.uploadedLineItems = null;
+            
+            // Hide success message if visible
+            document.getElementById('success-message').classList.add('hidden');
+            
+            // Clear contact selection
+            clearContact();
+            cancelNewContact();
+        }
+
+        function clearContact() {
+            selectedContactId = null;
+            document.getElementById('selected-contact').classList.add('hidden');
+        }
+
+        function cancelNewContact() {
+            document.getElementById('new-contact-form').classList.add('hidden');
+            document.getElementById('new-contact-name').value = '';
+            document.getElementById('new-contact-id').value = '';
+            document.getElementById('new-contact-email').value = '';
+        }
+
+        function selectContact(contact) {
+            if (typeof contact === 'object') {
+                selectedContactId = contact.id;
+                document.getElementById('contact-search').value = '';
+                document.getElementById('contact-results').classList.add('hidden');
+                document.getElementById('selected-contact').classList.remove('hidden');
+                document.getElementById('selected-contact').querySelector('p').textContent = `${contact.name} - Cédula: ${contact.identification}`;
+            } else {
+                // Legacy support for old function calls
+                selectedContactId = arguments[0];
+                const name = arguments[1];
+                const identification = arguments[2];
+                document.getElementById('contact-search').value = '';
+                document.getElementById('contact-results').classList.add('hidden');
+                document.getElementById('selected-contact').classList.remove('hidden');
+                document.getElementById('selected-contact').querySelector('p').textContent = `${name} - Cédula: ${identification}`;
+            }
+        }
+
+        function createContact() {
+            const name = document.getElementById('new-contact-name').value;
+            const identification = document.getElementById('new-contact-id').value;
+            const email = document.getElementById('new-contact-email').value;
+            
+            if (!name || !identification) {
+                alert('Por favor complete nombre y cédula');
+                return;
+            }
+            
+            showLoading();
+            
+            fetch('/api/contacts/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name, identification, email })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.success) {
+                    selectContact(data.contact);
+                    cancelNewContact();
+                } else {
+                    alert('Error creando cliente: ' + data.error);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                alert('Error creando cliente');
+            });
+        }
+
+        function showLoading() {
+            document.getElementById('loading').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        // Check API status on load
+        window.addEventListener('DOMContentLoaded', function() {
+            // Initialize event listeners
+            initializeApp();
+            
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.alegra_configured) {
+                        showStatusMessage('warning', 'Alegra API no está configurado. Por favor configura tus credenciales.');
+                    } else if (data.ai_configured) {
+                        showStatusMessage('info', `Extracción inteligente habilitada con ${data.ai_provider === 'openai' ? 'OpenAI' : 'Google Gemini'}`);
+                    }
+                });
+            
+            // Check system initialization
+            fetch('/api/system/init')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.ready) {
+                        document.getElementById('setup-btn').classList.remove('hidden');
+                        if (data.items.count === 0) {
+                            showStatusMessage('warning', 'No hay items configurados. Haz clic en "Configurar Sistema" para crear items predeterminados.');
+                        }
+                    }
+                });
+        });
+
+        function showStatusMessage(type, message) {
+            const colors = {
+                'info': 'blue',
+                'warning': 'yellow',
+                'error': 'red'
+            };
+            const color = colors[type] || 'gray';
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `bg-${color}-50 border border-${color}-200 text-${color}-800 px-4 py-3 rounded mb-4`;
+            alertDiv.innerHTML = message;
+            
+            const container = document.querySelector('.max-w-3xl');
+            container.insertBefore(alertDiv, container.firstChild.nextSibling);
+        }
+
+        function initializeApp() {
+            // Initialize Dropzone
+            Dropzone.autoDiscover = false;
+            dropzone = new Dropzone("#dropzone", {
+                url: "/api/upload",
+                acceptedFiles: ".pdf,.xml",
+                maxFilesize: 16, // MB
+                dictDefaultMessage: "Arrastra archivos aquí o haz clic para seleccionar",
+                dictFileTooBig: "El archivo es muy grande ({{filesize}}MB). Tamaño máximo: {{maxFilesize}}MB.",
+                dictInvalidFileType: "Solo se aceptan archivos PDF y XML.",
+                init: function() {
+                    this.on("success", function(file, response) {
+                        console.log('Upload successful:', response);
+                        
+                        if (response.success && response.data) {
+                            const data = response.data;
+                            
+                            // Show success message
+                            showUploadStatus('Archivo procesado correctamente', 'success');
+                            
+                            // Store PDF text for later use
+                            if (data.raw_text) {
+                                window.uploadedPdfText = data.raw_text;
+                            }
+                            
+                            // Store line items if from XML
+                            if (data.line_items && data.is_xml) {
+                                window.uploadedLineItems = data.line_items;
+                            }
+                            
+                            // Fill payment form with extracted data
+                            fillPaymentForm(data);
+                            
+                            // Auto-search for contact if vendor ID is found
+                            if (data.vendor_id) {
+                                searchContactByVendorId(data.vendor_id);
+                            }
+                            
+                            // Show payment form
+                            document.getElementById('payment-form-section').style.display = 'block';
+                        }
+                    });
+                    this.on("error", function(file, errorMessage) {
+                        alert('Error: ' + errorMessage);
+                    });
+                }
+            });
+
+            // Contact search
+            let searchTimeout;
+            document.getElementById('contact-search').addEventListener('input', function(e) {
+                clearTimeout(searchTimeout);
+                const query = e.target.value;
+                
+                if (query.length < 2) {
+                    document.getElementById('contact-results').classList.add('hidden');
+                    return;
+                }
+                
+                searchTimeout = setTimeout(() => {
+                    fetch(`/api/contacts/search?q=${encodeURIComponent(query)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            displayContactResults(data.contacts);
+                        });
+                }, 300);
+            });
+
+            // New contact form button
+            document.getElementById('new-contact-btn').addEventListener('click', function() {
+                document.getElementById('new-contact-form').classList.remove('hidden');
+            });
+
+            // Cancel new contact buttons
+            const cancelNewContactBtns = document.querySelectorAll('[onclick="cancelNewContact()"]');
+            cancelNewContactBtns.forEach(btn => {
+                btn.removeAttribute('onclick');
+                btn.addEventListener('click', cancelNewContact);
+            });
+
+            // Create contact buttons
+            const createContactBtns = document.querySelectorAll('[onclick="createContact()"]');
+            createContactBtns.forEach(btn => {
+                btn.removeAttribute('onclick');
+                btn.addEventListener('click', createContact);
+            });
+
+            // Clear contact buttons
+            const clearContactBtns = document.querySelectorAll('[onclick="clearContact()"]');
+            clearContactBtns.forEach(btn => {
+                btn.removeAttribute('onclick');
+                btn.addEventListener('click', clearContact);
+            });
+
+            // Reset form buttons
+            const resetFormBtns = document.querySelectorAll('[onclick="resetForm()"]');
+            resetFormBtns.forEach(btn => {
+                btn.removeAttribute('onclick');
+                btn.addEventListener('click', resetForm);
+            });
+
+            // Payment form submission
+            document.getElementById('payment-form').addEventListener('submit', handleFormSubmit);
+
+            // Setup button
+            document.getElementById('setup-btn').addEventListener('click', function() {
+                if (confirm('¿Desea configurar los items predeterminados del sistema?')) {
+                    showLoading();
+                    fetch('/api/system/setup', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        hideLoading();
+                        if (data.success) {
+                            alert('Sistema configurado correctamente');
+                            document.getElementById('setup-btn').classList.add('hidden');
+                            location.reload();
+                        } else {
+                            alert('Error configurando el sistema: ' + (data.errors ? data.errors.join(', ') : 'Error desconocido'));
+                        }
+                    })
+                    .catch(error => {
+                        hideLoading();
+                        alert('Error configurando el sistema');
+                    });
+                }
+            });
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            if (!selectedContactId) {
+                // Check if there's only one search result and auto-select it
+                const contactResults = document.getElementById('contact-results');
+                const contacts = contactResults.querySelectorAll('[onclick^="selectContact"]');
+                
+                if (contacts.length === 1) {
+                    // Auto-select the only result
+                    contacts[0].click();
+                    // Continue with form submission after a brief delay
+                    setTimeout(() => {
+                        document.getElementById('payment-form').dispatchEvent(new Event('submit'));
+                    }, 100);
+                    return;
+                }
+                
+                alert('Por favor seleccione o cree un cliente');
+                return;
+            }
+            
+            const formData = {
+                contactId: selectedContactId,
+                amount: document.getElementById('amount').value,
+                date: document.getElementById('date').value,
+                paymentMethod: document.getElementById('payment-method').value,
+                description: document.getElementById('description').value,
+                invoiceNumber: document.getElementById('invoice-number').value,
+                createPayment: document.getElementById('createPayment').checked,
+                pdfText: window.uploadedPdfText || null,
+                lineItems: window.uploadedLineItems || null
+            };
+            
+            // Get the submit button
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            showLoading();
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registrando...';
+            
+            fetch('/api/payments/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => response.json())
+            .then(result => {
+                hideLoading();
+                if (result.success) {
+                    // Show success message
+                    const successMsg = document.getElementById('success-message');
+                    document.getElementById('payment-form-section').style.display = 'none';
+                    successMsg.classList.remove('hidden');
+                    
+                    // Update success details
+                    let successDetails = `Factura ${result.bill.number || result.bill.id || ''} registrada por ₡${result.bill.amount.toFixed(2)}`;
+                    if (result.payment) {
+                        successDetails += ` y pago creado por ₡${result.payment.amount.toFixed(2)}`;
+                    }
+                    if (result.warning) {
+                        successDetails += `<br><span class="text-yellow-600">${result.warning}</span>`;
+                    }
+                    document.getElementById('success-details').innerHTML = successDetails;
+                    
+                    // Show line items if available
+                    if (result.lineItems && result.lineItems.length > 0) {
+                        const lineItemsSection = document.getElementById('line-items-section');
+                        const tbody = document.getElementById('line-items-body');
+                        
+                        tbody.innerHTML = result.lineItems.map(item => `
+                            <tr>
+                                <td class="px-4 py-2 text-sm text-gray-900">${item.description}</td>
+                                <td class="px-4 py-2 text-sm text-gray-900 text-right">₡${item.amount.toFixed(2)}</td>
+                                <td class="px-4 py-2 text-sm text-gray-900 text-center">
+                                    ${item.hasTax ? 
+                                        '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">13%</span>' : 
+                                        '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">0%</span>'
+                                    }
+                                </td>
+                            </tr>
+                        `).join('');
+                        
+                        lineItemsSection.classList.remove('hidden');
+                    }
+                    
+                    // Reset form after 5 seconds
+                    setTimeout(() => {
+                        resetForm();
+                        successMsg.classList.add('hidden');
+                        document.getElementById('line-items-section').classList.add('hidden');
+                    }, 5000);
+                } else {
+                    alert('Error registrando factura: ' + (result.error || 'Error desconocido'));
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Error:', error);
+                alert('Error al conectar con el servidor: ' + error.message);
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            });
+        }
+
+        function displayContactResults(contacts) {
+            const resultsDiv = document.getElementById('contact-results');
+            
+            if (contacts.length === 0) {
+                resultsDiv.innerHTML = '<div class="p-3 text-sm text-gray-500">No se encontraron clientes</div>';
+            } else {
+                resultsDiv.innerHTML = contacts.map(contact => `
+                    <div class="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0" onclick="selectContact(${contact.id}, '${contact.name}', '${contact.identification}')">
+                        <div class="font-medium">${contact.name}</div>
+                        <div class="text-sm text-gray-500">Cédula: ${contact.identification}</div>
+                    </div>
+                `).join('');
+            }
+            
+            resultsDiv.classList.remove('hidden');
+        }
+
+        function showVendorInfo(paymentInfo) {
+            const vendorInfoHtml = `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h3 class="font-medium text-blue-900 mb-2">Información del Vendedor Extraída</h3>
+                    <p class="text-sm text-blue-800">
+                        <strong>Vendedor:</strong> ${paymentInfo.vendor_name || 'No identificado'}<br>
+                        <strong>Cédula/ID:</strong> ${paymentInfo.vendor_id || 'No encontrado'}
+                    </p>
+                    ${paymentInfo.auto_matched ? 
+                        `<div class="mt-2 flex items-center text-green-700">
+                            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="text-sm font-medium">Cliente automáticamente identificado</span>
+                        </div>` : 
+                        `<div class="mt-2 text-sm text-blue-700">
+                            Buscando coincidencias en tus contactos...
+                        </div>`
+                    }
+                </div>
+            `;
+            
+            const formSection = document.getElementById('payment-form-section');
+            const existingInfo = formSection.querySelector('.vendor-info');
+            if (existingInfo) {
+                existingInfo.remove();
+            }
+            
+            const div = document.createElement('div');
+            div.className = 'vendor-info';
+            div.innerHTML = vendorInfoHtml;
+            formSection.insertBefore(div, formSection.querySelector('form'));
+        }
+
+        function populateForm(paymentInfo) {
+            if (paymentInfo.amount) {
+                document.getElementById('amount').value = paymentInfo.amount;
+            }
+            if (paymentInfo.date) {
+                document.getElementById('date').value = paymentInfo.date;
+            }
+            if (paymentInfo.description) {
+                document.getElementById('description').value = paymentInfo.description;
+            }
+            
+            // Handle auto-matched contact
+            if (paymentInfo.auto_matched && paymentInfo.matched_contact) {
+                selectContact(
+                    paymentInfo.matched_contact.id,
+                    paymentInfo.matched_contact.name,
+                    paymentInfo.matched_contact.identification
+                );
+                // Show auto-match notification
+                showAutoMatchNotification();
+            } else if (paymentInfo.vendor_name || paymentInfo.vendor_id) {
+                // Try to search by vendor info if not auto-matched
+                const searchTerm = paymentInfo.vendor_id || paymentInfo.vendor_name;
+                document.getElementById('contact-search').value = searchTerm;
+                // Trigger search
+                document.getElementById('contact-search').dispatchEvent(new Event('input'));
+            } else if (paymentInfo.client_name || paymentInfo.client_id) {
+                // Fallback to client info if no vendor info
+                document.getElementById('contact-search').value = paymentInfo.client_name || paymentInfo.client_id;
+                // Trigger search
+                document.getElementById('contact-search').dispatchEvent(new Event('input'));
+            }
+        }
+        
+        function showAutoMatchNotification() {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg transition-opacity duration-500';
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>¡Cliente identificado automáticamente!</span>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+
+        function showUploadStatus(message, type) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `mt-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`;
+            statusDiv.textContent = message;
+            document.getElementById('dropzone').parentElement.appendChild(statusDiv);
+            
+            setTimeout(() => {
+                statusDiv.remove();
+            }, 5000);
+        }
+        
+        function fillPaymentForm(data) {
+            // Show invoice info section
+            document.getElementById('invoice-info').style.display = 'block';
+            
+            // Fill invoice info display
+            document.getElementById('vendor-info-name').textContent = data.vendor_name || 'No identificado';
+            document.getElementById('vendor-info-id').textContent = data.vendor_id || 'No disponible';
+            document.getElementById('invoice-info-number').textContent = data.invoice_number || 'Sin número';
+            document.getElementById('invoice-info-total').textContent = data.total ? `₡${data.total.toLocaleString('es-CR')}` : '-';
+            
+            if (data.line_items && data.line_items.length > 0) {
+                document.getElementById('invoice-info-items').style.display = 'block';
+                document.getElementById('invoice-info-items-count').textContent = `${data.line_items.length} líneas encontradas`;
+            }
+            
+            // Fill form fields with extracted data
+            if (data.amount) {
+                document.getElementById('amount').value = data.amount;
+            }
+            if (data.total) {
+                document.getElementById('amount').value = data.total;
+            }
+            if (data.date) {
+                document.getElementById('date').value = data.date;
+            }
+            if (data.invoice_number) {
+                document.getElementById('invoice-number').value = data.invoice_number;
+            }
+            
+            // Create description
+            let description = `Factura de ${data.vendor_name || 'Proveedor'}`;
+            if (data.invoice_number) {
+                description += ` - Factura #${data.invoice_number}`;
+            }
+            document.getElementById('description').value = description;
+            
+            // Show line items if available
+            if (data.line_items && data.line_items.length > 0) {
+                displayLineItems(data.line_items);
+            }
+        }
+        
+        function displayLineItems(lineItems) {
+            const itemListContainer = document.getElementById('item-list');
+            if (!lineItems || lineItems.length === 0) {
+                itemListContainer.style.display = 'none';
+                return;
+            }
+            
+            // Store line items globally for form submission
+            window.uploadedLineItems = lineItems;
+            
+            itemListContainer.style.display = 'block';
+            
+            const itemListHtml = lineItems.map((item, index) => {
+                const amount = item.amount || (item.unit_price * item.quantity) || 0;
+                const quantity = item.quantity || 1;
+                const unitPrice = item.unit_price || amount / quantity || 0;
+                
+                // Check if this looks like a potentially incorrect calculation
+                const isPotentiallyIncorrect = unitPrice > 10000 && quantity > 10; // High unit price with high quantity
+                const warningClass = isPotentiallyIncorrect ? 'border-orange-300 bg-orange-50' : 'border-gray-200';
+                
+                return `
+                    <div class="bg-white border ${warningClass} rounded-lg p-3 mb-3">
+                        ${isPotentiallyIncorrect ? `
+                            <div class="mb-2 text-xs text-orange-600 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                                Verifique: precio unitario alto con cantidad alta
+                            </div>
+                        ` : ''}
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div class="md:col-span-2">
+                                <label class="text-xs text-gray-500">Descripción</label>
+                                <input type="text" 
+                                       id="item-desc-${index}" 
+                                       value="${item.description || ''}"
+                                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                       onchange="updateLineItem(${index}, 'description', this.value)">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500">Cantidad</label>
+                                <input type="number" 
+                                       id="item-qty-${index}" 
+                                       value="${quantity}"
+                                       min="0.01"
+                                       step="0.01"
+                                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                       onchange="updateLineItem(${index}, 'quantity', parseFloat(this.value) || 1)">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500">Precio Unitario (₡)</label>
+                                <input type="number" 
+                                       id="item-price-${index}" 
+                                       value="${unitPrice.toFixed(2)}"
+                                       min="0"
+                                       step="0.01"
+                                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                       onchange="updateLineItem(${index}, 'unit_price', parseFloat(this.value) || 0)">
+                            </div>
+                        </div>
+                        <div class="mt-2 flex justify-between items-center">
+                            <div class="flex items-center gap-3">
+                                <label class="text-xs flex items-center">
+                                    <input type="checkbox" 
+                                           id="item-tax-${index}"
+                                           ${item.has_tax ? 'checked' : ''}
+                                           class="mr-1"
+                                           onchange="updateLineItem(${index}, 'has_tax', this.checked)">
+                                    IVA 13%
+                                </label>
+                                <button type="button" onclick="deleteLineItem(${index})" class="text-xs text-red-600 hover:text-red-800">
+                                    Eliminar
+                                </button>
+                                ${isPotentiallyIncorrect ? `
+                                    <button type="button" onclick="suggestCorrection(${index})" class="text-xs text-blue-600 hover:text-blue-800">
+                                        Sugerir corrección
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="text-sm">
+                                <span class="text-gray-500">Subtotal:</span>
+                                <span class="font-medium text-gray-900" id="item-total-${index}">₡${amount.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            const itemsDiv = itemListContainer.querySelector('.space-y-2');
+            itemsDiv.innerHTML = itemListHtml;
+            
+            // Add button to add new line item
+            itemsDiv.innerHTML += `
+                <button type="button" onclick="addNewLineItem()" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                    + Agregar línea
+                </button>
+            `;
+            
+            updateTotals();
+        }
+        
+        function updateLineItem(index, field, value) {
+            if (!window.uploadedLineItems || !window.uploadedLineItems[index]) {
+                return;
+            }
+            
+            window.uploadedLineItems[index][field] = value;
+            
+            // Recalculate amount if quantity or unit_price changed
+            if (field === 'quantity' || field === 'unit_price') {
+                const item = window.uploadedLineItems[index];
+                item.amount = (item.unit_price || 0) * (item.quantity || 1);
+                
+                // Update the displayed subtotal
+                const totalSpan = document.getElementById(`item-total-${index}`);
+                if (totalSpan) {
+                    totalSpan.textContent = `₡${item.amount.toFixed(2)}`;
+                }
+            }
+            
+            // If tax changed, update tax percentage
+            if (field === 'has_tax') {
+                window.uploadedLineItems[index].tax_percentage = value ? 13 : 0;
+            }
+            
+            updateTotals();
+        }
+        
+        function addNewLineItem() {
+            if (!window.uploadedLineItems) {
+                window.uploadedLineItems = [];
+            }
+            
+            const newItem = {
+                description: '',
+                quantity: 1,
+                unit_price: 0,
+                amount: 0,
+                has_tax: true,
+                tax_percentage: 13,
+                account_id: '5077'  // Default to Gastos Generales
+            };
+            
+            window.uploadedLineItems.push(newItem);
+            displayLineItems(window.uploadedLineItems);
+        }
+        
+        function updateTotals() {
+            if (!window.uploadedLineItems || window.uploadedLineItems.length === 0) {
+                document.getElementById('items-subtotal').textContent = '₡0.00';
+                document.getElementById('items-tax').textContent = '₡0.00';
+                document.getElementById('items-total').textContent = '₡0.00';
+                document.getElementById('amount').value = '0';
+                return;
+            }
+            
+            const subtotal = window.uploadedLineItems.reduce((sum, item) => {
+                return sum + (item.amount || 0);
+            }, 0);
+            
+            const tax = window.uploadedLineItems.reduce((sum, item) => {
+                if (item.has_tax) {
+                    return sum + ((item.amount || 0) * 0.13);
+                }
+                return sum;
+            }, 0);
+            
+            const total = subtotal + tax;
+            
+            document.getElementById('items-subtotal').textContent = `₡${subtotal.toFixed(2)}`;
+            document.getElementById('items-tax').textContent = `₡${tax.toFixed(2)}`;
+            document.getElementById('items-total').textContent = `₡${total.toFixed(2)}`;
+            
+            // Update the main amount field
+            document.getElementById('amount').value = total.toFixed(2);
+        }
+
+        function searchContactByVendorId(vendorId) {
+            fetch(`/api/contacts/search?query=${encodeURIComponent(vendorId)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.contacts && data.contacts.length > 0) {
+                        // Auto-select the first matching contact
+                        const contact = data.contacts[0];
+                        selectContact(contact);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching contact:', error);
+                });
+        }
+
+        function deleteLineItem(index) {
+            if (!window.uploadedLineItems || !window.uploadedLineItems[index]) {
+                return;
+            }
+            
+            if (confirm('¿Está seguro de eliminar esta línea?')) {
+                window.uploadedLineItems.splice(index, 1);
+                displayLineItems(window.uploadedLineItems);
+            }
+        }
+
+        function suggestCorrection(index) {
+            if (!window.uploadedLineItems || !window.uploadedLineItems[index]) {
+                return;
+            }
+            
+            const item = window.uploadedLineItems[index];
+            const currentTotal = item.amount || (item.unit_price * item.quantity);
+            const currentQuantity = item.quantity || 1;
+            const currentUnitPrice = item.unit_price || 0;
+            
+            // Suggest that the current "unit price" might actually be the total
+            if (currentUnitPrice > 1000 && currentQuantity > 1) {
+                const suggestedUnitPrice = currentUnitPrice / currentQuantity;
+                const suggestedTotal = currentUnitPrice; // The "unit price" is actually the total
+                
+                const message = `¿Podría ser que:\n` +
+                    `• Total real: ₡${suggestedTotal.toLocaleString()}\n` +
+                    `• Cantidad: ${currentQuantity}\n` +
+                    `• Precio unitario: ₡${suggestedUnitPrice.toFixed(2)}\n\n` +
+                    `¿Aplicar esta corrección?`;
+                
+                if (confirm(message)) {
+                    // Update the item
+                    window.uploadedLineItems[index].unit_price = suggestedUnitPrice;
+                    window.uploadedLineItems[index].amount = suggestedTotal;
+                    
+                    // Update the UI
+                    document.getElementById(`item-price-${index}`).value = suggestedUnitPrice.toFixed(2);
+                    document.getElementById(`item-total-${index}`).textContent = `₡${suggestedTotal.toFixed(2)}`;
+                    
+                    updateTotals();
+                    
+                    // Refresh the display to remove the warning
+                    displayLineItems(window.uploadedLineItems);
+                }
+            }
+        }
+    </script>
+</body>
+</html> 

@@ -863,6 +863,8 @@
         }
         
         function displayLineItems(lineItems) {
+            console.log('📋 displayLineItems called with:', lineItems);
+            
             const itemListContainer = document.getElementById('item-list');
             if (!lineItems || lineItems.length === 0) {
                 itemListContainer.style.display = 'none';
@@ -870,17 +872,36 @@
             }
             
             // Store line items globally for form submission
-            window.uploadedLineItems = lineItems;
+            window.uploadedLineItems = lineItems.map((item, index) => {
+                // Ensure proper data types and values
+                const amount = parseFloat(item.amount) || (parseFloat(item.unit_price) * parseFloat(item.quantity)) || 0;
+                const quantity = parseFloat(item.quantity) || 1;
+                const unitPrice = parseFloat(item.unit_price) || amount / quantity || 0;
+                const hasTax = item.has_tax === true || item.has_tax === 'true' || item.has_tax === undefined; // Default to true if not specified
+                
+                console.log(`Processing item ${index}:`, {
+                    original: item,
+                    calculated: { amount, quantity, unitPrice, hasTax }
+                });
+                
+                return {
+                    ...item,
+                    amount: amount,
+                    quantity: quantity,
+                    unit_price: unitPrice,
+                    has_tax: hasTax,
+                    tax_percentage: hasTax ? 13 : 0,
+                    account_id: item.account_id || '5077'
+                };
+            });
+            
+            console.log('📋 Processed line items:', window.uploadedLineItems);
             
             itemListContainer.style.display = 'block';
             
-            const itemListHtml = lineItems.map((item, index) => {
-                const amount = item.amount || (item.unit_price * item.quantity) || 0;
-                const quantity = item.quantity || 1;
-                const unitPrice = item.unit_price || amount / quantity || 0;
-                
+            const itemListHtml = window.uploadedLineItems.map((item, index) => {
                 // Check if this looks like a potentially incorrect calculation
-                const isPotentiallyIncorrect = unitPrice > 10000 && quantity > 10; // High unit price with high quantity
+                const isPotentiallyIncorrect = item.unit_price > 10000 && item.quantity > 10;
                 const warningClass = isPotentiallyIncorrect ? 'border-orange-300 bg-orange-50' : 'border-gray-200';
                 
                 return `
@@ -906,7 +927,7 @@
                                 <label class="text-xs text-gray-500">Cantidad</label>
                                 <input type="number" 
                                        id="item-qty-${index}" 
-                                       value="${quantity}"
+                                       value="${item.quantity}"
                                        min="0.01"
                                        step="0.01"
                                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -916,7 +937,7 @@
                                 <label class="text-xs text-gray-500">Precio Unitario (₡)</label>
                                 <input type="number" 
                                        id="item-price-${index}" 
-                                       value="${unitPrice.toFixed(2)}"
+                                       value="${item.unit_price.toFixed(2)}"
                                        min="0"
                                        step="0.01"
                                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -944,7 +965,7 @@
                             </div>
                             <div class="text-sm">
                                 <span class="text-gray-500">Subtotal:</span>
-                                <span class="font-medium text-gray-900" id="item-total-${index}">₡${amount.toFixed(2)}</span>
+                                <span class="font-medium text-gray-900" id="item-total-${index}">₡${item.amount.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
@@ -965,7 +986,10 @@
         }
         
         function updateLineItem(index, field, value) {
+            console.log(`🔧 updateLineItem(${index}, '${field}', ${value})`);
+            
             if (!window.uploadedLineItems || !window.uploadedLineItems[index]) {
+                console.log('❌ Line item not found');
                 return;
             }
             
@@ -974,20 +998,32 @@
             // Recalculate amount if quantity or unit_price changed
             if (field === 'quantity' || field === 'unit_price') {
                 const item = window.uploadedLineItems[index];
-                item.amount = (item.unit_price || 0) * (item.quantity || 1);
+                const newAmount = (parseFloat(item.unit_price) || 0) * (parseFloat(item.quantity) || 1);
+                item.amount = newAmount;
+                
+                console.log(`💰 Recalculated amount for item ${index}:`, {
+                    unit_price: item.unit_price,
+                    quantity: item.quantity,
+                    new_amount: newAmount
+                });
                 
                 // Update the displayed subtotal
                 const totalSpan = document.getElementById(`item-total-${index}`);
                 if (totalSpan) {
-                    totalSpan.textContent = `₡${item.amount.toFixed(2)}`;
+                    totalSpan.textContent = `₡${newAmount.toFixed(2)}`;
                 }
             }
             
             // If tax changed, update tax percentage
             if (field === 'has_tax') {
                 window.uploadedLineItems[index].tax_percentage = value ? 13 : 0;
+                console.log(`🏷️ Updated tax for item ${index}:`, {
+                    has_tax: value,
+                    tax_percentage: window.uploadedLineItems[index].tax_percentage
+                });
             }
             
+            console.log(`📊 Updated item ${index}:`, window.uploadedLineItems[index]);
             updateTotals();
         }
         
@@ -1028,7 +1064,11 @@
         }
         
         function updateTotals() {
+            console.log('🔍 updateTotals called');
+            console.log('uploadedLineItems:', window.uploadedLineItems);
+            
             if (!window.uploadedLineItems || window.uploadedLineItems.length === 0) {
+                console.log('❌ No line items found');
                 document.getElementById('items-subtotal').textContent = '₡0.00';
                 document.getElementById('items-tax').textContent = '₡0.00';
                 document.getElementById('items-total').textContent = '₡0.00';
@@ -1036,18 +1076,34 @@
                 return;
             }
             
-            const subtotal = window.uploadedLineItems.reduce((sum, item) => {
-                return sum + (item.amount || 0);
-            }, 0);
+            let subtotal = 0;
+            let tax = 0;
             
-            const tax = window.uploadedLineItems.reduce((sum, item) => {
-                if (item.has_tax) {
-                    return sum + ((item.amount || 0) * 0.13);
+            window.uploadedLineItems.forEach((item, index) => {
+                const itemAmount = parseFloat(item.amount) || 0;
+                const itemHasTax = item.has_tax === true || item.has_tax === 'true';
+                
+                console.log(`Item ${index}:`, {
+                    description: item.description,
+                    amount: itemAmount,
+                    has_tax: itemHasTax,
+                    original_has_tax: item.has_tax
+                });
+                
+                subtotal += itemAmount;
+                
+                if (itemHasTax) {
+                    tax += itemAmount * 0.13;
                 }
-                return sum;
-            }, 0);
+            });
             
             const total = subtotal + tax;
+            
+            console.log('💰 Calculated totals:', {
+                subtotal: subtotal,
+                tax: tax,
+                total: total
+            });
             
             document.getElementById('items-subtotal').textContent = `₡${subtotal.toFixed(2)}`;
             document.getElementById('items-tax').textContent = `₡${tax.toFixed(2)}`;

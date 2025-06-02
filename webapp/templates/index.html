@@ -878,10 +878,11 @@
                 const quantity = parseFloat(item.quantity) || 1;
                 const unitPrice = parseFloat(item.unit_price) || amount / quantity || 0;
                 const hasTax = item.has_tax === true || item.has_tax === 'true' || item.has_tax === undefined; // Default to true if not specified
+                const taxPercentage = parseFloat(item.tax_percentage) || (hasTax ? 13 : 0);
                 
                 console.log(`Processing item ${index}:`, {
                     original: item,
-                    calculated: { amount, quantity, unitPrice, hasTax }
+                    calculated: { amount, quantity, unitPrice, hasTax, taxPercentage }
                 });
                 
                 return {
@@ -890,7 +891,10 @@
                     quantity: quantity,
                     unit_price: unitPrice,
                     has_tax: hasTax,
-                    tax_percentage: hasTax ? 13 : 0,
+                    tax_percentage: taxPercentage,
+                    needs_manual_selection: item.needs_manual_selection || false,
+                    confidence_level: item.confidence_level || 'high',
+                    iva_reasoning: item.iva_reasoning || '',
                     account_id: item.account_id || '5077'
                 };
             });
@@ -902,16 +906,26 @@
             const itemListHtml = window.uploadedLineItems.map((item, index) => {
                 // Check if this looks like a potentially incorrect calculation
                 const isPotentiallyIncorrect = item.unit_price > 10000 && item.quantity > 10;
+                const needsManualSelection = item.needs_manual_selection || item.confidence_level === 'low';
                 const warningClass = isPotentiallyIncorrect ? 'border-orange-300 bg-orange-50' : 'border-gray-200';
+                const taxWarningClass = needsManualSelection ? 'border-yellow-300 bg-yellow-50' : '';
                 
                 return `
-                    <div class="bg-white border ${warningClass} rounded-lg p-3 mb-3">
+                    <div class="bg-white border ${warningClass} ${taxWarningClass} rounded-lg p-3 mb-3">
                         ${isPotentiallyIncorrect ? `
                             <div class="mb-2 text-xs text-orange-600 flex items-center">
                                 <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                                 </svg>
                                 Verifique: precio unitario alto con cantidad alta
+                            </div>
+                        ` : ''}
+                        ${needsManualSelection ? `
+                            <div class="mb-2 text-xs text-yellow-700 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                </svg>
+                                Revise el IVA: ${item.iva_reasoning || 'La IA no pudo determinar el porcentaje correcto automáticamente'}
                             </div>
                         ` : ''}
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -946,14 +960,17 @@
                         </div>
                         <div class="mt-2 flex justify-between items-center">
                             <div class="flex items-center gap-3">
-                                <label class="text-xs flex items-center">
-                                    <input type="checkbox" 
-                                           id="item-tax-${index}"
-                                           ${item.has_tax ? 'checked' : ''}
-                                           class="mr-1"
-                                           onchange="updateLineItem(${index}, 'has_tax', this.checked)">
-                                    IVA 13%
-                                </label>
+                                <div class="flex items-center gap-2">
+                                    <label class="text-xs text-gray-500">IVA:</label>
+                                    <select id="item-tax-${index}" 
+                                            class="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 ${needsManualSelection ? 'border-yellow-400 bg-yellow-50' : ''}"
+                                            onchange="updateLineItemTax(${index}, this.value)">
+                                        <option value="0" ${item.tax_percentage === 0 ? 'selected' : ''}>Sin IVA (0%)</option>
+                                        <option value="1" ${item.tax_percentage === 1 ? 'selected' : ''}>IVA 1%</option>
+                                        <option value="2" ${item.tax_percentage === 2 ? 'selected' : ''}>IVA 2%</option>
+                                        <option value="13" ${item.tax_percentage === 13 ? 'selected' : ''}>IVA 13%</option>
+                                    </select>
+                                </div>
                                 <button type="button" onclick="deleteLineItem(${index})" class="text-xs text-red-600 hover:text-red-800">
                                     Eliminar
                                 </button>
@@ -985,6 +1002,27 @@
             updateTotals();
         }
         
+        function updateLineItemTax(index, taxPercentage) {
+            console.log(`🏷️ updateLineItemTax(${index}, ${taxPercentage})`);
+            
+            if (!window.uploadedLineItems || !window.uploadedLineItems[index]) {
+                console.log('❌ Line item not found');
+                return;
+            }
+            
+            const taxPercent = parseFloat(taxPercentage);
+            window.uploadedLineItems[index].tax_percentage = taxPercent;
+            window.uploadedLineItems[index].has_tax = taxPercent > 0;
+            window.uploadedLineItems[index].needs_manual_selection = false; // User has manually selected
+            
+            console.log(`🏷️ Updated tax for item ${index}:`, {
+                tax_percentage: taxPercent,
+                has_tax: taxPercent > 0
+            });
+            
+            updateTotals();
+        }
+
         function updateLineItem(index, field, value) {
             console.log(`🔧 updateLineItem(${index}, '${field}', ${value})`);
             
@@ -1012,15 +1050,6 @@
                 if (totalSpan) {
                     totalSpan.textContent = `₡${newAmount.toFixed(2)}`;
                 }
-            }
-            
-            // If tax changed, update tax percentage
-            if (field === 'has_tax') {
-                window.uploadedLineItems[index].tax_percentage = value ? 13 : 0;
-                console.log(`🏷️ Updated tax for item ${index}:`, {
-                    has_tax: value,
-                    tax_percentage: window.uploadedLineItems[index].tax_percentage
-                });
             }
             
             console.log(`📊 Updated item ${index}:`, window.uploadedLineItems[index]);
@@ -1081,19 +1110,18 @@
             
             window.uploadedLineItems.forEach((item, index) => {
                 const itemAmount = parseFloat(item.amount) || 0;
-                const itemHasTax = item.has_tax === true || item.has_tax === 'true';
+                const taxPercentage = parseFloat(item.tax_percentage) || 0;
                 
                 console.log(`Item ${index}:`, {
                     description: item.description,
                     amount: itemAmount,
-                    has_tax: itemHasTax,
-                    original_has_tax: item.has_tax
+                    tax_percentage: taxPercentage
                 });
                 
                 subtotal += itemAmount;
                 
-                if (itemHasTax) {
-                    tax += itemAmount * 0.13;
+                if (taxPercentage > 0) {
+                    tax += itemAmount * (taxPercentage / 100);
                 }
             });
             

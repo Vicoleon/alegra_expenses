@@ -4,11 +4,13 @@ import alegra
 from werkzeug.utils import secure_filename
 import PyPDF2
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import json
 import requests
 import xml.etree.ElementTree as ET
+import logging
+import tempfile
 
 # Load environment variables from .env file
 load_dotenv()
@@ -31,6 +33,13 @@ alegra.token = os.environ.get('ALEGRA_TOKEN', '')
 AI_PROVIDER = os.environ.get('AI_PROVIDER', 'openai').lower()  # 'openai' or 'gemini'
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+def get_tax_id_by_percentage(percentage, all_taxes):
+    """Get tax ID based on percentage"""
+    for tax in all_taxes:
+        if isinstance(tax, dict) and float(tax.get('percentage', 0)) == float(percentage):
+            return int(tax['id'])
+    return None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
@@ -442,7 +451,31 @@ def analyze_invoice_items_with_ai(pdf_text, expense_accounts):
     3. NO uses el total de la factura como precio unitario
     4. Para combustibles: si dice "36.13 litros" y "Total ₡25,000", entonces precio_unitario = 25000 ÷ 36.13
     
-    INSTRUCCIONES ESPECÍFICAS:
+    INSTRUCCIONES ESPECÍFICAS PARA IVA:
+    1. Analiza CUIDADOSAMENTE la descripción de cada producto/servicio para determinar el IVA correcto
+    2. En Costa Rica existen estas tasas de IVA:
+       - 13%: La mayoría de productos y servicios (tasa general)
+       - 2%: Productos específicos como seguros, algunos alimentos básicos, medicinas
+       - 1%: Ciertos servicios financieros específicos
+       - 0%: Productos exentos (exportaciones, algunos alimentos básicos, libros, etc.)
+    
+    3. REGLAS PARA DETERMINAR IVA:
+       - Si la descripción contiene "13%" → usar 13%
+       - Si la descripción contiene "2%" → usar 2%  
+       - Si la descripción contiene "1%" → usar 1%
+       - Si contiene "GRAVADA 13%" → usar 13%
+       - Si contiene "GRAVADA 2%" → usar 2%
+       - Si contiene "GRAVADA 1%" → usar 1%
+       - Para seguros (PRIMA, PRIMA NETA): típicamente 2%
+       - Para productos alimenticios básicos: puede ser 2% o exento
+       - Para medicinas: típicamente 2%
+       - Para libros, periódicos: típicamente exento (0%)
+       - Para servicios financieros: puede ser 1%
+       - Si no puedes determinar o no hay indicación clara: usar 13% (tasa general)
+    
+    4. IMPORTANTE: Si NO PUEDES determinar automáticamente el porcentaje de IVA correcto, marca como "needs_manual_selection": true
+    
+    INSTRUCCIONES GENERALES:
     1. CADA producto/servicio como una línea separada
     2. NO agrupes múltiples productos en una sola línea
     3. Calcula correctamente: amount = unit_price × quantity
@@ -456,13 +489,19 @@ def analyze_invoice_items_with_ai(pdf_text, expense_accounts):
     4. Monto total de la línea (precio unitario × cantidad)
     5. account_id: El ID de la cuenta contable más apropiada (OBLIGATORIO - usa 5077 si no puedes determinar)
     6. Si aplica IVA/impuesto (true/false)
-    7. Porcentaje de IVA (típicamente 13% en Costa Rica)
+    7. Porcentaje de IVA (0, 1, 2, o 13)
+    8. needs_manual_selection: true si no puedes determinar el IVA con certeza
+    9. confidence_level: "high", "medium", "low" para indicar qué tan seguro estás del porcentaje de IVA
     
     EJEMPLOS:
     - Si ves "36.13 litros combustible Super, Total: ₡25,000"
-      → quantity: 36.13, unit_price: 692.05 (25000÷36.13), amount: 25000
-    - Si ves "2 servicios de consultoría, ₡50,000 c/u"
-      → quantity: 2, unit_price: 50000, amount: 100000
+      → quantity: 36.13, unit_price: 692.05 (25000÷36.13), amount: 25000, tax_percentage: 13
+    - Si ves "PRIMA NETA GRAVADA 2%, ₡2510.08"
+      → tax_percentage: 2, confidence_level: "high"
+    - Si ves "PRIMA NETA GRAVADA 13%, ₡1893.56"
+      → tax_percentage: 13, confidence_level: "high"
+    - Si ves "Seguro médico" sin indicación clara
+      → tax_percentage: 2, confidence_level: "medium", needs_manual_selection: true
     
     Responde en formato JSON:
     {{
@@ -474,12 +513,16 @@ def analyze_invoice_items_with_ai(pdf_text, expense_accounts):
                 "amount": monto total de la línea (unit_price × quantity),
                 "account_id": "ID de la cuenta contable apropiada",
                 "has_tax": true/false,
-                "tax_percentage": número (13 para IVA normal, 0 si no aplica)
+                "tax_percentage": número (0, 1, 2, o 13),
+                "needs_manual_selection": true/false,
+                "confidence_level": "high/medium/low",
+                "iva_reasoning": "breve explicación de por qué elegiste este porcentaje"
             }}
         ],
         "total_subtotal": suma de todos los amounts,
         "total_tax": suma de todos los impuestos,
-        "total": total con impuestos
+        "total": total con impuestos,
+        "requires_manual_review": true/false
     }}
     
     Texto de la factura:
@@ -498,7 +541,7 @@ def analyze_invoice_items_with_ai(pdf_text, expense_accounts):
                 response = client.chat.completions.create(
                     model="gpt-4",
                     messages=[
-                        {"role": "system", "content": "Eres un experto en análisis de facturas de Costa Rica."},
+                        {"role": "system", "content": "Eres un experto en análisis de facturas de Costa Rica y conoces perfectamente las diferentes tasas de IVA (0%, 1%, 2%, 13%)."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.1
@@ -758,11 +801,52 @@ def upload_file():
             
             # Extract structured data from PDF using AI if available
             if (AI_PROVIDER == 'openai' and OPENAI_API_KEY) or (AI_PROVIDER == 'gemini' and GEMINI_API_KEY):
-                # Use AI extraction
+                # Use AI extraction for basic invoice info
                 extracted_data = extract_payment_info_with_ai(pdf_text)
+                
+                # Get expense accounts for line item analysis
+                import base64
+                credentials = f"{alegra.user}:{alegra.token}"
+                encoded_credentials = base64.b64encode(credentials.encode()).decode()
+                headers = {
+                    'Authorization': f'Basic {encoded_credentials}',
+                    'Content-Type': 'application/json'
+                }
+                
+                expense_accounts = []
+                try:
+                    accounts_response = requests.get(
+                        'https://api.alegra.com/api/v1/categories?limit=200',
+                        headers=headers
+                    )
+                    if accounts_response.status_code == 200:
+                        accounts = accounts_response.json()
+                        if isinstance(accounts, list):
+                            for a in accounts:
+                                if (a.get('type') == 'expense' and 
+                                    a.get('id') not in ['5066', '5065']):
+                                    expense_accounts.append({
+                                        'id': a['id'], 
+                                        'code': a.get('code', ''), 
+                                        'name': a['name'], 
+                                        'description': a.get('description', '')
+                                    })
+                except Exception as e:
+                    print(f"Error fetching expense accounts: {e}")
+                
+                # Extract line items with AI
+                print("🤖 Analyzing PDF with AI to extract line items...")
+                line_items = analyze_invoice_items_with_ai(pdf_text, expense_accounts)
+                if line_items and len(line_items) > 0:
+                    extracted_data['line_items'] = line_items
+                    print(f"✅ AI found {len(line_items)} line items")
+                else:
+                    print("❌ AI did not find any line items")
+                    extracted_data['line_items'] = []
             else:
                 # Fallback to regex extraction
                 extracted_data = extract_invoice_data(pdf_text)
+                extracted_data['line_items'] = []  # No AI means no line items
                 
             extracted_data['raw_text'] = pdf_text
             extracted_data['is_xml'] = False
@@ -1144,15 +1228,25 @@ def register_payment():
             headers=headers
         )
         available_taxes = []
+        tax_ids_by_percentage = {}
         iva_tax_id = None
+        
         if taxes_response.status_code == 200:
             taxes = taxes_response.json()
+            available_taxes = taxes
+            
+            # Create a mapping of percentage to tax ID
             for tax in taxes:
                 if isinstance(tax, dict):
-                    if 'IVA' in tax.get('name', '').upper() or tax.get('percentage') == 13:
+                    percentage = float(tax.get('percentage', 0))
+                    tax_ids_by_percentage[percentage] = int(tax['id'])
+                    
+                    # Keep backwards compatibility for default IVA tax
+                    if 'IVA' in tax.get('name', '').upper() or percentage == 13:
                         iva_tax_id = int(tax['id'])
-                        print(f"Found IVA tax with ID: {iva_tax_id}")
-                        break
+                        
+            print(f"Available tax mappings: {tax_ids_by_percentage}")
+            print(f"Default IVA tax ID: {iva_tax_id}")
         
         # Process line items - either from XML or analyze with AI
         line_items_data = []
@@ -1229,9 +1323,16 @@ def register_payment():
                         'quantity': float(item.get('quantity', 1))
                     }
                     
-                    # Add tax if applicable
-                    if item.get('has_tax') and iva_tax_id:
+                    # Add tax if applicable - support multiple tax percentages
+                    tax_percentage = float(item.get('tax_percentage', 0))
+                    if tax_percentage > 0 and tax_percentage in tax_ids_by_percentage:
+                        tax_id = tax_ids_by_percentage[tax_percentage]
+                        item_entry['tax'] = [{'id': tax_id}]
+                        print(f"Applied {tax_percentage}% tax (ID: {tax_id}) to item")
+                    elif item.get('has_tax') and iva_tax_id:
+                        # Fallback to default IVA tax for backwards compatibility
                         item_entry['tax'] = [{'id': iva_tax_id}]
+                        print(f"Applied default IVA tax (ID: {iva_tax_id}) to item")
                     
                     items_list.append(item_entry)
             else:
@@ -1291,9 +1392,16 @@ def register_payment():
                         'observations': item.get('description', f'Línea {idx+1}')
                     }
                     
-                    # Add tax if applicable
-                    if item.get('has_tax') and iva_tax_id:
+                    # Add tax if applicable - support multiple tax percentages
+                    tax_percentage = float(item.get('tax_percentage', 0))
+                    if tax_percentage > 0 and tax_percentage in tax_ids_by_percentage:
+                        tax_id = tax_ids_by_percentage[tax_percentage]
+                        category_entry['tax'] = [{'id': tax_id}]
+                        print(f"Applied {tax_percentage}% tax (ID: {tax_id}) to category")
+                    elif item.get('has_tax') and iva_tax_id:
+                        # Fallback to default IVA tax for backwards compatibility
                         category_entry['tax'] = [{'id': iva_tax_id}]
+                        print(f"Applied default IVA tax (ID: {iva_tax_id}) to category")
                     
                     categories.append(category_entry)
             
@@ -2097,6 +2205,18 @@ def create_purchase_item():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def get_tax_id_by_percentage(percentage, all_taxes):
+    """Get tax ID based on percentage"""
+    for tax in all_taxes:
+        if isinstance(tax, dict) and float(tax.get('percentage', 0)) == float(percentage):
+            return int(tax['id'])
+    return None
+
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host='0.0.0.0', port=int(os.environ.get('PORT', 10000))) 
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 Starting server on port {port}")
+    print(f"📊 Alegra user: {alegra.user}")
+    print(f"🤖 AI Provider: {AI_PROVIDER}")
+    print("Access the application at: http://localhost:5000")
+    serve(app, host='0.0.0.0', port=port) 

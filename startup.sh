@@ -1,10 +1,37 @@
 #!/bin/bash
+
+# Debug: Show where we start
+echo "=== DEBUG: Initial location ==="
+pwd
+ls -la
+
+# Debug: Look for app.py in various locations
+echo "=== DEBUG: Searching for app.py files ==="
+find /opt/render/project -name "app.py" -type f 2>/dev/null || echo "No app.py found anywhere"
+
+# Debug: Show full project structure
+echo "=== DEBUG: Full project structure ==="
+ls -la /opt/render/project/src/
+
+# Debug: Look in webapp directory (if it exists)
+if [ -d "/opt/render/project/src/webapp" ]; then
+    echo "=== DEBUG: webapp directory contents ==="
+    ls -la /opt/render/project/src/webapp/
+else
+    echo "=== DEBUG: webapp directory does not exist! ==="
+fi
+
+# Try to find the correct directory
+echo "=== DEBUG: Looking for directories with app.py ==="
+find /opt/render/project -name "*.py" -exec dirname {} \; | sort | uniq
+
+# Change to webapp directory
 cd webapp
 
 # Debug: Show current directory and files
-echo "=== DEBUG: Current directory ==="
+echo "=== DEBUG: Current directory after cd webapp ==="
 pwd
-echo "=== DEBUG: Files in directory ==="
+echo "=== DEBUG: Files in current directory ==="
 ls -la
 
 # Debug: Check environment variables

@@ -159,6 +159,14 @@
                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                     </div>
 
+                    <!-- Manual Line Items Button -->
+                    <div class="mb-4">
+                        <button type="button" onclick="createManualLineItems()" class="text-sm text-blue-600 hover:text-blue-800 border border-blue-300 px-3 py-1 rounded">
+                            📋 Agregar Líneas de Detalle Manualmente
+                        </button>
+                        <p class="text-xs text-gray-500 mt-1">Utilice esto si la IA no detectó automáticamente las líneas de la factura</p>
+                    </div>
+
                     <!-- Line Items Display -->
                     <div id="item-list" class="mb-6 bg-gray-50 rounded-lg p-4" style="display: none;">
                         <div class="flex items-center justify-between mb-3">
@@ -819,6 +827,12 @@
             if (data.line_items && data.line_items.length > 0) {
                 document.getElementById('invoice-info-items').style.display = 'block';
                 document.getElementById('invoice-info-items-count').textContent = `${data.line_items.length} líneas encontradas`;
+                console.log('✅ Line items found:', data.line_items.length, 'items');
+                console.log('Line items data:', data.line_items);
+                displayLineItems(data.line_items);
+            } else {
+                console.log('❌ No line items found in AI response');
+                console.log('Full data:', data);
             }
             
             // Fill form fields with extracted data
@@ -993,6 +1007,23 @@
             };
             
             window.uploadedLineItems.push(newItem);
+            displayLineItems(window.uploadedLineItems);
+        }
+        
+        function createManualLineItems() {
+            // Create a default line item if none exist
+            if (!window.uploadedLineItems || window.uploadedLineItems.length === 0) {
+                window.uploadedLineItems = [{
+                    description: 'Producto/Servicio 1',
+                    quantity: 1,
+                    unit_price: 0,
+                    amount: 0,
+                    has_tax: true,
+                    tax_percentage: 13,
+                    account_id: '5077'
+                }];
+            }
+            
             displayLineItems(window.uploadedLineItems);
         }
         

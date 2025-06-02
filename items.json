@@ -1,0 +1,443 @@
+{
+    "count": 6,
+    "items": [
+        {
+            "calculationScale": 0,
+            "category": {
+                "id": "5062",
+                "name": "Ventas"
+            },
+            "customFields": [],
+            "description": null,
+            "extraProductKey": null,
+            "id": "3",
+            "inventory": {
+                "unit": "unit"
+            },
+            "itemType": null,
+            "name": "Beneficios de empleados",
+            "price": [
+                {
+                    "currency": {
+                        "code": "CRC",
+                        "symbol": "\u20a1"
+                    },
+                    "edited": false,
+                    "idPriceList": "1",
+                    "main": true,
+                    "name": "General",
+                    "price": 35398,
+                    "type": "amount"
+                }
+            ],
+            "productKey": "9723000000200",
+            "reference": null,
+            "status": "active",
+            "tax": [
+                {
+                    "categoryFavorable": {
+                        "blocked": "no",
+                        "categoryRule": {
+                            "id": "117",
+                            "key": "INPUT_IVA_CRI",
+                            "name": "IVA soportado"
+                        },
+                        "code": null,
+                        "description": "En esta cuenta se acumula el IVA pagado",
+                        "id": "5015",
+                        "idParent": "5014",
+                        "name": "IVA soportado",
+                        "nature": "debit",
+                        "readOnly": false,
+                        "showThirdPartyBalance": true,
+                        "status": "active",
+                        "text": "IVA soportado",
+                        "type": "asset",
+                        "use": "movement"
+                    },
+                    "categoryToBePaid": {
+                        "blocked": "no",
+                        "categoryRule": {
+                            "id": "118",
+                            "key": "OUTPUT_IVA_CRI",
+                            "name": "IVA repercutido"
+                        },
+                        "code": null,
+                        "description": "En esta cuenta se acumula el IVA facturado",
+                        "id": "5046",
+                        "idParent": "5045",
+                        "name": "IVA repercutido",
+                        "nature": "credit",
+                        "readOnly": false,
+                        "showThirdPartyBalance": true,
+                        "status": "active",
+                        "text": "IVA repercutido",
+                        "type": "liability",
+                        "use": "movement"
+                    },
+                    "deductible": "yes",
+                    "description": "",
+                    "id": "3",
+                    "name": "IVA",
+                    "percentage": "13.00",
+                    "status": "active",
+                    "type": "IVA"
+                }
+            ],
+            "type": "service",
+            "versionElectronicInvoicing": "4.3"
+        },
+        {
+            "calculationScale": 0,
+            "category": {
+                "id": "5062",
+                "name": "Ventas"
+            },
+            "customFields": [],
+            "description": null,
+            "extraProductKey": null,
+            "id": "4",
+            "inventory": {
+                "unit": "unit"
+            },
+            "itemType": null,
+            "name": "Beneficios de empleados",
+            "price": [
+                {
+                    "currency": {
+                        "code": "CRC",
+                        "symbol": "\u20a1"
+                    },
+                    "edited": false,
+                    "idPriceList": "1",
+                    "main": true,
+                    "name": "General",
+                    "price": 36018,
+                    "type": "amount"
+                }
+            ],
+            "productKey": "9723000000200",
+            "reference": null,
+            "status": "active",
+            "tax": [
+                {
+                    "categoryFavorable": {
+                        "blocked": "no",
+                        "categoryRule": {
+                            "id": "117",
+                            "key": "INPUT_IVA_CRI",
+                            "name": "IVA soportado"
+                        },
+                        "code": null,
+                        "description": "En esta cuenta se acumula el IVA pagado",
+                        "id": "5015",
+                        "idParent": "5014",
+                        "name": "IVA soportado",
+                        "nature": "debit",
+                        "readOnly": false,
+                        "showThirdPartyBalance": true,
+                        "status": "active",
+                        "text": "IVA soportado",
+                        "type": "asset",
+                        "use": "movement"
+                    },
+                    "categoryToBePaid": {
+                        "blocked": "no",
+                        "categoryRule": {
+                            "id": "118",
+                            "key": "OUTPUT_IVA_CRI",
+                            "name": "IVA repercutido"
+                        },
+                        "code": null,
+                        "description": "En esta cuenta se acumula el IVA facturado",
+                        "id": "5046",
+                        "idParent": "5045",
+                        "name": "IVA repercutido",
+                        "nature": "credit",
+                        "readOnly": false,
+                        "showThirdPartyBalance": true,
+                        "status": "active",
+                        "text": "IVA repercutido",
+                        "type": "liability",
+                        "use": "movement"
+                    },
+                    "deductible": "yes",
+                    "description": "",
+                    "id": "3",
+                    "name": "IVA",
+                    "percentage": "13.00",
+                    "status": "active",
+                    "type": "IVA"
+                }
+            ],
+            "type": "service",
+            "versionElectronicInvoicing": "4.3"
+        },
+        {
+            "accounting": {
+                "inventariablePurchase": {
+                    "blocked": "no",
+                    "categoryRule": {
+                        "id": "33",
+                        "key": "INVENTARIABLE_PURCHASES",
+                        "name": "Costo de ventas"
+                    },
+                    "code": null,
+                    "description": "",
+                    "id": "5069",
+                    "idParent": "5068",
+                    "name": "Costos del inventario",
+                    "nature": "debit",
+                    "readOnly": true,
+                    "showThirdPartyBalance": true,
+                    "status": "active",
+                    "text": "Costos del inventario",
+                    "type": "expense",
+                    "use": "movement"
+                },
+                "inventory": {
+                    "blocked": "no",
+                    "categoryRule": {
+                        "id": "7",
+                        "key": "INVENTORY",
+                        "name": "Inventario"
+                    },
+                    "code": null,
+                    "description": "",
+                    "id": "5023",
+                    "idParent": "5002",
+                    "name": "Inventarios",
+                    "nature": "debit",
+                    "readOnly": false,
+                    "showThirdPartyBalance": true,
+                    "status": "active",
+                    "text": "Inventarios",
+                    "type": "asset",
+                    "use": "movement"
+                }
+            },
+            "calculationScale": 0,
+            "category": {
+                "id": "5062",
+                "name": "Ventas"
+            },
+            "customFields": [],
+            "description": null,
+            "extraProductKey": null,
+            "id": "1",
+            "inventory": {
+                "availableQuantity": 1,
+                "initialQuantity": 1,
+                "initialQuantityDate": "2022-02-08",
+                "unit": "unit",
+                "unitCost": 3382,
+                "warehouses": [
+                    {
+                        "address": null,
+                        "availableQuantity": 1,
+                        "costCenter": null,
+                        "id": "1",
+                        "initialQuantity": 1,
+                        "isDefault": true,
+                        "maxQuantity": null,
+                        "minQuantity": null,
+                        "name": "Principal",
+                        "observations": null,
+                        "status": "active"
+                    }
+                ]
+            },
+            "itemType": null,
+            "name": "Consultoria",
+            "price": [
+                {
+                    "currency": {
+                        "code": "CRC",
+                        "symbol": "\u20a1"
+                    },
+                    "edited": false,
+                    "idPriceList": "1",
+                    "main": true,
+                    "name": "General",
+                    "price": 3382,
+                    "type": "amount"
+                }
+            ],
+            "productKey": "8313100009900",
+            "reference": null,
+            "status": "inactive",
+            "tax": [],
+            "type": "product",
+            "versionElectronicInvoicing": "4.3"
+        },
+        {
+            "calculationScale": 0,
+            "category": {
+                "id": "5061",
+                "name": "Ingresos por ventas"
+            },
+            "customFields": [],
+            "description": null,
+            "extraProductKey": null,
+            "id": "2",
+            "inventory": {
+                "unit": "service"
+            },
+            "itemType": null,
+            "name": "Consultoria",
+            "price": [
+                {
+                    "currency": {
+                        "code": "CRC",
+                        "symbol": "\u20a1"
+                    },
+                    "edited": false,
+                    "idPriceList": "1",
+                    "main": true,
+                    "name": "General",
+                    "price": 1641000,
+                    "type": "amount"
+                }
+            ],
+            "productKey": "8313100009900",
+            "reference": null,
+            "status": "active",
+            "tax": [],
+            "type": "service",
+            "versionElectronicInvoicing": "4.3"
+        },
+        {
+            "accounting": {
+                "inventariablePurchase": {
+                    "blocked": "no",
+                    "categoryRule": {
+                        "id": "33",
+                        "key": "INVENTARIABLE_PURCHASES",
+                        "name": "Costo de ventas"
+                    },
+                    "code": null,
+                    "description": "",
+                    "id": "5069",
+                    "idParent": "5068",
+                    "name": "Costos del inventario",
+                    "nature": "debit",
+                    "readOnly": true,
+                    "showThirdPartyBalance": true,
+                    "status": "active",
+                    "text": "Costos del inventario",
+                    "type": "expense",
+                    "use": "movement"
+                },
+                "inventory": {
+                    "blocked": "no",
+                    "categoryRule": {
+                        "id": "7",
+                        "key": "INVENTORY",
+                        "name": "Inventario"
+                    },
+                    "code": null,
+                    "description": "",
+                    "id": "5023",
+                    "idParent": "5002",
+                    "name": "Inventarios",
+                    "nature": "debit",
+                    "readOnly": false,
+                    "showThirdPartyBalance": true,
+                    "status": "active",
+                    "text": "Inventarios",
+                    "type": "asset",
+                    "use": "movement"
+                }
+            },
+            "calculationScale": 0,
+            "category": {
+                "id": "5062",
+                "name": "Ventas"
+            },
+            "customFields": [],
+            "description": null,
+            "extraProductKey": null,
+            "id": "6",
+            "inventory": {
+                "availableQuantity": -1,
+                "initialQuantity": 1,
+                "initialQuantityDate": "2025-01-02",
+                "unit": "unit",
+                "unitCost": 35,
+                "warehouses": [
+                    {
+                        "address": null,
+                        "availableQuantity": -1,
+                        "costCenter": null,
+                        "id": "1",
+                        "initialQuantity": 1,
+                        "isDefault": true,
+                        "maxQuantity": null,
+                        "minQuantity": null,
+                        "name": "Principal",
+                        "observations": null,
+                        "status": "active"
+                    }
+                ]
+            },
+            "itemType": null,
+            "name": "EOY Party 2024 - Meals & Entertainment",
+            "price": [
+                {
+                    "currency": {
+                        "code": "CRC",
+                        "symbol": "\u20a1"
+                    },
+                    "edited": false,
+                    "idPriceList": "1",
+                    "main": true,
+                    "name": "General",
+                    "price": 17500,
+                    "type": "amount"
+                }
+            ],
+            "productKey": "6332000000000",
+            "reference": null,
+            "status": "active",
+            "tax": [],
+            "type": "product",
+            "versionElectronicInvoicing": "4.3"
+        },
+        {
+            "calculationScale": 0,
+            "category": {
+                "id": "5062",
+                "name": "Ventas"
+            },
+            "customFields": [],
+            "description": null,
+            "extraProductKey": null,
+            "id": "5",
+            "inventory": {
+                "unit": "hour"
+            },
+            "itemType": null,
+            "name": "Service performed / Kforce",
+            "price": [
+                {
+                    "currency": {
+                        "code": "CRC",
+                        "symbol": "\u20a1"
+                    },
+                    "edited": false,
+                    "idPriceList": "1",
+                    "main": true,
+                    "name": "General",
+                    "price": 20790,
+                    "type": "amount"
+                }
+            ],
+            "productKey": "8313100009900",
+            "reference": null,
+            "status": "active",
+            "tax": [],
+            "type": "service",
+            "versionElectronicInvoicing": "4.3"
+        }
+    ]
+}
